@@ -21,21 +21,75 @@ namespace Huestel.Tools.AnalyticsPlacer.App
 
         private void btnReplace_Click(object sender, EventArgs e)
         {
-            string rootDirectoryPath = "";
-            string GACode = "";
+            // Check if GA code is set
+            if (String.IsNullOrWhiteSpace(txtGACode.Text))
+            {
+                MessageBox.Show("Analytics Code not set", "Missing GA code", MessageBoxButtons.OK,
+                    MessageBoxIcon.Exclamation);
+                return;
+            }
 
+            btnReplace.Enabled = false;
 
-            List<FileInfo> sourceFiles = GetFilesList(rootDirectoryPath);
-            List<FileInfo> replacedFiles = PlaceAnalyticsCodeInFiles(GACode, sourceFiles);
+            BackgroundWorker worker = new BackgroundWorker();
+            worker.WorkerReportsProgress = true;
+            worker.WorkerSupportsCancellation = true;
+            worker.DoWork += worker_DoWork;
+            worker.ProgressChanged += worker_ProgressChanged;
+            worker.RunWorkerCompleted += worker_RunWorkerCompleted;
+
+            // Get directories
+            if (sourceDirectoryDialog.ShowDialog() == DialogResult.OK)
+            {
+                if (targetDirectoryDialog.ShowDialog() == DialogResult.OK)
+                {
+                    worker.RunWorkerAsync();
+                }
+            }
+
+            btnReplace.Enabled = false;
         }
 
-        private List<FileInfo> PlaceAnalyticsCodeInFiles(string gaCode, List<FileInfo> sourceFiles)
+        void worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-            List<FileInfo> ret = new List<FileInfo>();
+            MessageBox.Show("Done!", "Process finished", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            progress.Value = 0;
+        }
 
-            foreach (var file in sourceFiles)
+        void worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            lblProgress.Text = "Processing file no. " + e.ProgressPercentage;
+        }
+
+        void worker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            BackgroundWorker worker = sender as BackgroundWorker;
+
+            PlaceAnalyticsCodeInFiles(worker, txtGACode.Text, sourceDirectoryDialog.SelectedPath,
+                       targetDirectoryDialog.SelectedPath);
+
+        }
+
+        /// <summary>
+        /// Place code in html files,
+        /// </summary>
+        /// <param name="worker">BackgroundWorker</param>
+        /// <param name="gaCode">Google Analytics Code</param>
+        /// <param name="sourceDirectory">Source Directory</param>
+        /// <param name="targetDirectory">Target Directory</param>
+        private void PlaceAnalyticsCodeInFiles(BackgroundWorker worker, string gaCode, string sourceDirectory, string targetDirectory)
+        {
+            int i = 0;
+
+            List<string> files = Directory.EnumerateFiles(sourceDirectory, "*.*", SearchOption.AllDirectories).ToList();
+            int numberoOfFiles = files.Count;
+            
+            foreach (string file in files)
             {
-                string fileContent = File.ReadAllText(file.FullName);
+                worker.ReportProgress((i));
+                i++;
+
+                string fileContent = File.ReadAllText(file);
 
                 string resultString = null;
                 try
@@ -44,25 +98,28 @@ namespace Huestel.Tools.AnalyticsPlacer.App
                 }
                 catch (ArgumentException ex)
                 {
-                    // Syntax error in the regular expression
+                    throw ex;
                 }
 
 
                 if (!String.IsNullOrWhiteSpace(resultString))
                 {
-
                     fileContent = fileContent.Replace(resultString, gaCode + resultString);
-                    File.WriteAllText(file.FullName, fileContent);
-                    ret.Add(file);
+
+                    string directory = Path.GetDirectoryName(file);
+                    string fileName = Path.GetFileName(file);
+                    string finalDirectory = targetDirectory + directory.Replace(sourceDirectory, "");
+
+                    if (!Directory.Exists(finalDirectory))
+                    {
+                        Directory.CreateDirectory(finalDirectory);
+                    }
+
+                    string finalPath = finalDirectory + "\\" + fileName;
+                    File.WriteAllText(finalPath, fileContent);                    
                 }
             }
-
-            return ret;
         }
 
-        private List<FileInfo> GetFilesList(string rootDirectoryPath)
-        {
-            throw new NotImplementedException();
-        }
     }
 }
