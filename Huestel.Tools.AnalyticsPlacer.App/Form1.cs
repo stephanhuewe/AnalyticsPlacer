@@ -53,7 +53,6 @@ namespace Huestel.Tools.AnalyticsPlacer.App
         void worker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             MessageBox.Show("Done!", "Process finished", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            progress.Value = 0;
         }
 
         void worker_ProgressChanged(object sender, ProgressChangedEventArgs e)
